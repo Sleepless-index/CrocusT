@@ -1,0 +1,721 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#16161b">
+<title>PubPets CG</title>
+<style>
+:root{--bg:#0b0b0e;--surface:#16161b;--raised:#202028;--line:#2e2e38;--fg:#fff;--dim:#b9b9c6;--accent:#ff4d8d;--on-accent:#0b0b0e;--r:6px;--s2:8px;--s3:12px;--s4:16px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-style:normal;overflow:hidden}
+canvas{width:100%;height:100%;display:block;touch-action:none}
+button,select{font:inherit;color:inherit}
+button{border:0;background:none;padding:0;cursor:pointer}
+.ic{width:22px;height:22px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.num{font-variant-numeric:tabular-nums}
+.btn{height:44px;min-width:44px;padding:0 var(--s3);display:flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r);background:var(--raised);border:1px solid var(--line);transition:background .12s,color .12s,transform .08s}
+.btn:active{transform:scale(.96);background:var(--line)}
+.btn.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.dim{color:var(--dim)}
+.ui{position:fixed;left:0;right:0;z-index:2;background:var(--surface);transition:opacity .2s,transform .2s}
+#top{top:0;display:flex;align-items:center;gap:var(--s2);padding:calc(var(--s2) + env(safe-area-inset-top,0px)) var(--s2) var(--s2);border-bottom:1px solid var(--line)}
+#bottom{bottom:0;display:flex;flex-direction:column;gap:var(--s3);padding:var(--s3) var(--s3) calc(var(--s3) + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
+body.hide #top{opacity:0;transform:translateY(-100%);pointer-events:none}
+body.hide #bottom{opacity:0;transform:translateY(100%);pointer-events:none}
+#ttl{flex:1;min-width:0;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:var(--s2)}
+#anim{flex:0 1 45%;min-width:0;height:44px;padding:0 36px 0 var(--s3);border-radius:var(--r);appearance:none;-webkit-appearance:none;outline:none;
+ background:var(--raised) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+ border:1px solid var(--line);text-overflow:ellipsis}
+#anim option{background:var(--surface);color:var(--fg)}
+.seekrow{display:flex;align-items:center;gap:var(--s3);color:var(--dim);font-size:14px}
+.seekrow span{min-width:36px}
+#tdur{text-align:right}
+input[type=range]{flex:1;height:28px;margin:0;background:transparent;-webkit-appearance:none;appearance:none;--p:0%}
+input[type=range]::-webkit-slider-runnable-track{height:4px;background:linear-gradient(to right,var(--accent) var(--p),var(--line) var(--p))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;margin-top:-6px;border-radius:50%;background:var(--fg)}
+input[type=range]::-moz-range-track{height:4px;background:var(--line)}
+input[type=range]::-moz-range-progress{height:4px;background:var(--accent)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:var(--fg)}
+.ctrl{display:flex;align-items:center;justify-content:space-between;gap:var(--s2)}
+.xport{display:flex;align-items:center;gap:var(--s2)}
+.ctrl .play{width:80px;height:52px;background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.ctrl .play:active{background:var(--accent);opacity:.85}
+.ctrl .play .ic{width:26px;height:26px;fill:currentColor}
+.chips{display:flex;gap:var(--s2)}
+.chips .btn{flex:1;height:40px;font-size:14px;color:var(--dim)}
+.chips .btn.on{color:var(--on-accent)}
+#skin{flex:2;min-width:0;white-space:nowrap;overflow:hidden}
+.screen{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;background:var(--bg);padding-top:env(safe-area-inset-top,0px)}
+.head{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s4)}
+.head h1{flex:1;margin:0;font-size:22px;font-weight:600}
+#skins{position:fixed;inset:0;z-index:6}
+#skbg{position:absolute;inset:0}
+#sksheet{touch-action:pan-y;position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;max-height:65vh;max-height:65dvh;background:var(--surface);border-top:1px solid var(--line);border-radius:12px 12px 0 0;animation:up .18s ease-out;padding:var(--s2) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom,0px))}
+.grab{width:36px;height:4px;border-radius:2px;background:var(--line);margin:0 auto var(--s3)}
+@keyframes up{from{transform:translateY(24px);opacity:0}}
+#sklist{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.sec{display:flex;flex-wrap:wrap;gap:var(--s2);margin-bottom:var(--s3)}
+.sech{flex:0 0 100%;margin:0;color:var(--dim);font-size:13px;font-weight:600}
+.chip{height:40px;padding:0 var(--s4);border-radius:var(--r);background:var(--raised);border:1px solid var(--line);transition:background .12s,color .12s}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.note{padding:var(--s4);color:var(--dim)}
+#tabs{display:flex;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line);padding:0 var(--s2)}
+#tabs::-webkit-scrollbar{display:none}
+#tabs button{flex:none;padding:0 var(--s4);height:44px;color:var(--dim);font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .12s,border-color .12s}
+#tabs button.on{color:var(--fg);border-bottom-color:var(--accent)}
+.grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:var(--s4) var(--s3);padding:var(--s4) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom,0px));align-content:start}
+.tile{display:flex;flex-direction:column;gap:6px;transition:opacity .1s}
+.tile:active{opacity:.7}
+.thumb{position:relative;aspect-ratio:16/10;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:linear-gradient(90deg,var(--raised) 30%,var(--line) 50%,var(--raised) 70%) 100% 0/300% 100%;animation:shine 1.2s linear infinite}
+.thumb.done{animation:none;background:var(--raised)}
+@keyframes shine{to{background-position:0 0}}
+.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .15s}
+.thumb img.ok{opacity:1}
+.tile span{font-size:14px;font-weight:500}
+#load{position:fixed;top:0;left:0;right:0;height:3px;z-index:9;overflow:hidden;background:var(--line)}
+#load::before{content:"";display:block;height:100%;width:35%;background:var(--accent);animation:slide 1s ease-in-out infinite}
+@keyframes slide{from{transform:translateX(-100%)}to{transform:translateX(300%)}}
+#toast{position:fixed;left:50%;top:calc(76px + env(safe-area-inset-top,0px));z-index:9;max-width:90%;padding:var(--s2) var(--s3);border-radius:var(--r);background:var(--raised);border:1px solid var(--line);opacity:0;transform:translate(-50%,-6px);transition:opacity .15s,transform .15s;pointer-events:none;font-size:14px}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></symbol>
+<symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z"/></symbol>
+<symbol id="i-next" viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></symbol>
+<symbol id="i-vol" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
+<symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9l6 6M22 9l-6 6"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-9"/></symbol>
+<symbol id="i-auto" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/></symbol>
+<symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></symbol>
+</defs></svg>
+<canvas id="c"></canvas>
+<div id="load" hidden></div>
+<div id="toast"></div>
+<div id="top" class="ui">
+  <button id="gal" class="btn" aria-label="Back to gallery"><svg class="ic"><use href="#i-back"/></svg></button>
+  <div id="ttl">PubPets</div>
+  <select id="anim" aria-label="Animation"></select>
+</div>
+<div id="bottom" class="ui">
+  <div class="seekrow num"><span id="tcur">0.0</span><input type="range" id="seek" min="0" max="1000" value="0"><span id="tdur">0.0</span></div>
+  <div class="ctrl">
+    <button id="spd" class="btn num">1x</button>
+    <div class="xport">
+      <button id="prev" class="btn" aria-label="Previous animation"><svg class="ic"><use href="#i-prev"/></svg></button>
+      <button id="pp" class="btn play" aria-label="Play or pause"><svg class="ic"><use href="#i-pause"/></svg></button>
+      <button id="next" class="btn" aria-label="Next animation"><svg class="ic"><use href="#i-next"/></svg></button>
+    </div>
+    <button id="mute" class="btn" aria-label="Sound"><svg class="ic"><use href="#i-vol"/></svg></button>
+  </div>
+  <div class="chips">
+    <button id="auto" class="btn on" aria-label="Auto-next"><svg class="ic"><use href="#i-auto"/></svg></button>
+    <button id="skin" class="btn" hidden>Skins</button>
+    <button id="rst" class="btn" aria-label="Reset pose"><svg class="ic"><use href="#i-reset"/></svg></button>
+    <button id="shot" class="btn" aria-label="Save frame"><svg class="ic"><use href="#i-save"/></svg></button>
+  </div>
+</div>
+<div id="games" class="screen" hidden>
+  <div class="head"><h1>Games</h1></div>
+  <div id="ggrid" class="grid"></div>
+</div>
+<div id="gallery" class="screen" hidden>
+  <div class="head"><button id="gback" class="btn" aria-label="Back to games"><svg class="ic"><use href="#i-back"/></svg></button><h1 id="gtitle">Gallery</h1></div>
+  <div id="tabs"></div>
+  <div id="grid" class="grid"></div>
+</div>
+<div id="skins" hidden>
+  <div id="skbg"></div>
+  <div id="sksheet"><div class="grab"></div><div id="sklist"></div></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+let toastT = 0;
+function toast(m){
+  const t = $('toast'); t.textContent = m; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2500);
+}
+function initViewer(game, data){
+const G = game.path + '/';
+const canvas = $('c');
+const gl = canvas.getContext('webgl', {alpha:false, premultipliedAlpha:true, preserveDrawingBuffer:true});
+const renderer = new spine.SceneRenderer(canvas, gl);
+const animSel = $('anim'), seek = $('seek');
+let curCG = '', curSeq = null, seqIdx = 0, curAtlas = null, nextPre = null, switching = false;
+let skel, state, sd, pma = true, last = 0, animIdx = 0;
+let auto = true, paused = false, dragging = false, speed = 1, muted = false;
+let zoom = 1, panX = 0, panY = 0, baseVW = 1, baseVH = 1;
+let groups = [], picks = [];
+const SPEEDS = [0.5, 1, 1.5, 2];
+const icon = id => '<svg class="ic"><use href="#' + id + '"/></svg>';
+
+const TITLES = {};
+data.groups.forEach(g => g.items.forEach(it => { TITLES[it.id] = it.title || it.id; }));
+
+function loadImg(src){
+  return new Promise((res, rej) => {
+    const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src;
+  });
+}
+
+/* ---- sound: spine events carry audio paths; files go in viewer/audio/ ---- */
+const audioCache = new Map(), playing = new Set();
+async function audioUrl(p){
+  if (audioCache.has(p)) return audioCache.get(p);
+  const m = p.match(/^(.*)\.([^.\/]+)$/);
+  const base = m ? m[1] : p, ext = m ? m[2].toLowerCase() : '';
+  let url = null;
+  for (const x of [...new Set([ext, 'ogg', 'wav', 'mp3', 'm4a'].filter(Boolean))]){
+    const u = G + 'audio/' + base.split('/').map(encodeURIComponent).join('/') + '.' + x;
+    try { const r = await fetch(u, {method:'HEAD'}); if (r.ok){ url = u; break; } } catch(e){}
+  }
+  audioCache.set(p, url);
+  return url;
+}
+async function playEvent(ev){
+  if (muted) return;
+  const p = ev && ev.data && ev.data.audioPath;
+  if (!p) return;
+  const url = await audioUrl(p);
+  if (!url || muted) return;
+  const a = new Audio(url);
+  const v = ev.volume;
+  a.volume = (typeof v === 'number' && v > 0) ? Math.min(v, 1) : 1;
+  playing.add(a);
+  a.onended = a.onerror = () => playing.delete(a);
+  a.play().catch(() => playing.delete(a));
+}
+function stopAudio(){ playing.forEach(a => a.pause()); playing.clear(); }
+
+/* ---- missing atlas regions: draw nothing instead of failing the whole skeleton ---- */
+const blanks = new Map();
+function blankRegion(name, glx){
+  if (!blanks.has(glx)){
+    const c = document.createElement('canvas'); c.width = c.height = 1;
+    const pg = new spine.TextureAtlasPage('blank');
+    pg.width = pg.height = 1;
+    pg.setTexture(new spine.GLTexture(glx, c));
+    blanks.set(glx, pg);
+  }
+  const pg = blanks.get(glx);
+  const r = new spine.TextureAtlasRegion(pg, name);
+  r.texture = pg.texture;
+  r.u = r.v = 0; r.u2 = r.v2 = 1;
+  r.width = r.height = r.originalWidth = r.originalHeight = 1;
+  return r;
+}
+
+async function buildSkeleton(name, glx){
+  const base = G + 'cg/' + name;
+  const atlas = new spine.TextureAtlas(await (await fetch(base + '.atlas')).text());
+  for (const p of atlas.pages){
+    let img;
+    try { img = await loadImg(G + 'cg/' + p.name.trim().split('/').pop()); }
+    catch(e){ img = await loadImg(base + '.png'); }
+    p.setTexture(new spine.GLTexture(glx, img));
+  }
+  const missing = new Set();
+  const findRegion = atlas.findRegion.bind(atlas);
+  const names = atlas.regions.map(r => r.name);
+  const loader = new spine.AtlasAttachmentLoader(atlas);
+  let curSkin = '';
+  for (const k of ['newRegionAttachment', 'newMeshAttachment']){
+    const orig = loader[k].bind(loader);
+    loader[k] = (skin, ...a) => { curSkin = skin ? skin.name : ''; return orig(skin, ...a); };
+  }
+  atlas.findRegion = n => {
+    const exact = findRegion(n);
+    if (exact) return exact;
+    const g = guessRegion(n, curSkin, names);
+    if (g) return findRegion(g);
+    missing.add(n);
+    return blankRegion(n, glx);
+  };
+  const json = new spine.SkeletonJson(loader);
+  const data = json.readSkeletonData(await (await fetch(base + '.json')).text());
+  return {atlas, data, missing, pma: atlas.pages[0].pma};
+}
+
+const tokens = s => s.toLowerCase().split(/[\s\/_\-]+/).filter(Boolean);
+const tones = ['black', 'tan', 'white'];
+const close = (a, b) => a === b || (a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a)));
+function guessRegion(path, skinName, names){
+  const q = tokens(path.startsWith('skin_') ? path.slice(5) : path);
+  const st = tokens(skinName);
+  const scored = [];
+  for (const full of names){
+    const parts = full.split('/');
+    const bt = tokens(parts[parts.length - 1]);
+    let hit = -1;
+    for (let i = 0; i + q.length <= bt.length && hit < 0; i++) if (q.every((t, j) => bt[i + j] === t)) hit = i;
+    if (hit < 0) continue;
+    const extra = bt.filter((_, i) => i < hit || i >= hit + q.length);
+    const around = extra.concat(tokens(parts.slice(0, -1).join('/')));
+    let score = 0;
+    for (const t of st) if (around.some(x => close(t, x))) score += 2;
+    for (const t of extra) if (t.length === 1 && st.some(k => tones.includes(k) && k[0] === t)) score += 3;
+    score -= extra.filter(t => t.length > 1 && !st.some(k => close(k, t))).length;
+    score -= 0.5 * extra.filter(t => t.length === 1 && !st.some(k => tones.includes(k) && k[0] === t)).length;
+    scored.push([score, full]);
+  }
+  scored.sort((a, b) => b[0] - a[0]);
+  if (!scored.length || (scored.length > 1 && scored[0][0] === scored[1][0])) return null;
+  return scored[0][1];
+}
+
+function skinGroups(data){
+  const m = new Map();
+  data.skins.forEach(k => {
+    if (k.name === 'default') return;
+    const c = k.name.lastIndexOf('/');
+    const cat = c < 0 ? '' : k.name.slice(0, c);
+    if (!m.has(cat)) m.set(cat, []);
+    m.get(cat).push(k);
+  });
+  return [...m].map(([cat, list]) => ({cat, list}));
+}
+function defaultPicks(gs){
+  return gs.map(g => g.list.length > 1 || !/guide/i.test(g.list[0].name) ? g.list[0] : null);
+}
+function comboSkin(data, ps){
+  const sk = new spine.Skin('view');
+  ps.forEach(k => { if (k) sk.addSkin(k); });
+  return sk;
+}
+function applyPicks(){
+  skel.setSkin(comboSkin(sd, picks));
+  skel.setSlotsToSetupPose();
+}
+
+function play(i, reset){
+  const n = sd.animations.length;
+  if (!n) return;
+  animIdx = (i + n) % n;
+  animSel.selectedIndex = animIdx;
+  if (reset){ stopAudio(); state.clearTracks(); skel.setToSetupPose(); }
+  state.setAnimation(0, sd.animations[animIdx].name, !auto);
+  state.timeScale = speed;
+}
+
+const hasNext = () => curSeq && seqIdx + 1 < curSeq.length;
+function preloadNext(){
+  nextPre = null;
+  if (!hasNext()) return;
+  const n = curSeq[seqIdx + 1];
+  nextPre = {name: n, p: buildSkeleton(n, gl).catch(() => null)};
+}
+async function stepSeq(d){
+  const idx = seqIdx + d;
+  if (!curSeq || switching || idx < 0 || idx >= curSeq.length) return;
+  switching = true;
+  seqIdx = idx;
+  const name = curSeq[idx];
+  const built = nextPre && nextPre.name === name ? await nextPre.p : null;
+  nextPre = null;
+  await load(name, built, d < 0);
+  switching = false;
+}
+
+async function load(name, pre, fromEnd){
+  try {
+    curCG = name;
+    stopAudio();
+    $('ttl').textContent = (TITLES[name] || name) + (curSeq ? ' · ' + (seqIdx + 1) + '/' + curSeq.length : '');
+    if (!pre) $('load').hidden = false;
+    const built = pre || await buildSkeleton(name, gl);
+    const old = curAtlas;
+    curAtlas = built.atlas;
+    pma = built.pma;
+    const missing = built.missing;
+    const data = built.data;
+    const stData = new spine.AnimationStateData(data);
+    stData.defaultMix = 0.2;
+    sd = data;
+    skel = new spine.Skeleton(sd);
+    groups = skinGroups(sd);
+    picks = defaultPicks(groups);
+    $('skin').hidden = !groups.length;
+    $('skins').hidden = true;
+    if (groups.length) applyPicks();
+    if (missing.size){
+      console.warn('Missing atlas regions in ' + name + ':', [...missing]);
+      toast(missing.size + ' image(s) missing from atlas: ' + [...missing].slice(0, 2).join(', '));
+    }
+    state = new spine.AnimationState(stData);
+    state.addListener({
+      event: (entry, ev) => playEvent(ev),
+      complete: () => {
+        if (!auto || dragging) return;
+        if (animIdx === sd.animations.length - 1 && hasNext()) stepSeq(1);
+        else play(animIdx + 1, false);
+      }
+    });
+    animSel.innerHTML = '';
+    sd.animations.forEach(a => animSel.add(new Option(a.name, a.name)));
+    resetView();
+    play(fromEnd ? sd.animations.length - 1 : 0, true);
+    if (old) try { old.dispose(); } catch(e){}
+    preloadNext();
+  } catch(e){ console.error(e); toast('Could not load ' + (TITLES[name] || name)); }
+  $('load').hidden = true;
+}
+
+animSel.onchange = () => play(animSel.selectedIndex, true);
+$('prev').onclick = () => { if (animIdx === 0 && curSeq && seqIdx > 0) stepSeq(-1); else play(animIdx - 1, true); };
+$('next').onclick = () => { if (animIdx === sd.animations.length - 1 && hasNext()) stepSeq(1); else play(animIdx + 1, true); };
+$('pp').onclick = () => {
+  paused = !paused;
+  if (paused) stopAudio();
+  $('pp').innerHTML = icon(paused ? 'i-play' : 'i-pause');
+};
+$('spd').onclick = () => {
+  speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];
+  $('spd').textContent = speed + 'x';
+  if (state) state.timeScale = speed;
+};
+$('auto').onclick = () => {
+  auto = !auto; $('auto').classList.toggle('on', auto);
+  if (state) play(animIdx, false);
+};
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+function secTitle(cat){ return cap(cat.split('/').pop() || 'Style'); }
+function buildSkins(){
+  const l = $('sklist'); l.innerHTML = '';
+  const extras = [];
+  const section = (title, chips) => {
+    const sec = document.createElement('div'); sec.className = 'sec';
+    const h = document.createElement('div'); h.className = 'sech'; h.textContent = title;
+    sec.append(h, ...chips);
+    l.append(sec);
+  };
+  const chip = (label, on, fn) => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (on ? ' on' : '');
+    b.textContent = label;
+    b.onclick = fn;
+    return b;
+  };
+  groups.forEach((g, gi) => {
+    if (g.list.length === 1){ extras.push(gi); return; }
+    const chips = g.list.map(k => chip(k.name.split('/').pop(), picks[gi] === k, () => {
+      picks[gi] = k; applyPicks();
+      chips.forEach((c, n) => c.classList.toggle('on', g.list[n] === k));
+    }));
+    section(secTitle(g.cat), chips);
+  });
+  if (extras.length){
+    section('Extras', extras.map(gi => {
+      const k = groups[gi].list[0];
+      const b = chip(k.name.split('/').pop(), !!picks[gi], () => {
+        picks[gi] = picks[gi] ? null : k; applyPicks();
+        b.classList.toggle('on', !!picks[gi]);
+      });
+      return b;
+    }));
+  }
+}
+$('skin').onclick = () => {
+  if (!groups.length) return;
+  buildSkins();
+  $('skins').hidden = false;
+};
+function closeSkins(){
+  $('skins').hidden = true;
+  $('sksheet').style.cssText = '';
+}
+$('skbg').onclick = closeSkins;
+{
+  const sheet = $('sksheet'), list = $('sklist');
+  let startY = 0, drag = false;
+  sheet.addEventListener('touchstart', e => { startY = e.touches[0].clientY; drag = false; }, {passive:true});
+  sheet.addEventListener('touchmove', e => {
+    const y = e.touches[0].clientY;
+    if (!drag){
+      if (list.scrollTop > 0 && !e.target.closest('.grab')){ startY = y; return; }
+      if (y - startY < 8) return;
+      drag = true;
+      sheet.style.animation = 'none';
+      sheet.style.transition = 'none';
+    }
+    e.preventDefault();
+    sheet.style.transform = 'translateY(' + Math.max(y - startY, 0) + 'px)';
+  }, {passive:false});
+  sheet.addEventListener('touchend', e => {
+    if (!drag) return;
+    drag = false;
+    const dy = e.changedTouches[0].clientY - startY;
+    sheet.style.transition = 'transform .18s ease-out';
+    if (dy > 90){
+      sheet.style.transform = 'translateY(100%)';
+      setTimeout(closeSkins, 180);
+    } else sheet.style.transform = '';
+  });
+}
+$('rst').onclick = () => { resetView(); if (state) play(animIdx, true); };
+$('mute').onclick = () => {
+  muted = !muted;
+  if (muted) stopAudio();
+  $('mute').classList.toggle('dim', muted);
+  $('mute').innerHTML = icon(muted ? 'i-mute' : 'i-vol');
+};
+$('shot').onclick = () => {
+  canvas.toBlob(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = (curCG || 'cg') + '_' + (animSel.value || 'anim') + '.png';
+    a.click();
+    toast('Saved ' + a.download);
+  });
+};
+
+seek.addEventListener('pointerdown', () => { dragging = true; });
+seek.addEventListener('pointerup', () => { dragging = false; });
+seek.addEventListener('input', () => {
+  const e = state && state.getCurrent(0);
+  if (e) e.trackTime = (seek.value / 1000) * (e.animationEnd - e.animationStart);
+});
+
+let hideTimer;
+function showUI(){
+  document.body.classList.remove('hide');
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => { if (!dragging) document.body.classList.add('hide'); }, 4000);
+}
+function zoomAt(sx, sy, z2){
+  z2 = Math.min(Math.max(z2, 0.1), 12);
+  const cw = canvas.clientWidth, ch = canvas.clientHeight;
+  const fx = sx / cw - 0.5, fy = sy / ch - 0.5;
+  const wx = panX + fx * baseVW / zoom, wy = panY - fy * baseVH / zoom;
+  zoom = z2;
+  panX = wx - fx * baseVW / zoom;
+  panY = wy + fy * baseVH / zoom;
+}
+function panBy(dx, dy){
+  panX -= dx / canvas.clientWidth * baseVW / zoom;
+  panY += dy / canvas.clientHeight * baseVH / zoom;
+}
+function resetView(){ zoom = 1; panX = 0; panY = 0; }
+
+const ptrs = new Map();
+let moved = false, lastTap = 0, tapTimer = 0, pinchD = 0;
+function mid(){
+  const p = [...ptrs.values()];
+  return {x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2, d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y)};
+}
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  moved = false;
+  if (ptrs.size === 2) pinchD = mid().d;
+});
+canvas.addEventListener('pointermove', e => {
+  const p = ptrs.get(e.pointerId);
+  if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  if (ptrs.size === 1){
+    if (moved || Math.hypot(dx, dy) > 6){ moved = true; panBy(dx, dy); p.x = e.clientX; p.y = e.clientY; }
+  } else if (ptrs.size === 2){
+    const before = mid();
+    p.x = e.clientX; p.y = e.clientY;
+    const after = mid();
+    moved = true;
+    panBy(after.x - before.x, after.y - before.y);
+    if (pinchD > 0) zoomAt(after.x, after.y, zoom * after.d / pinchD);
+    pinchD = after.d;
+  }
+});
+function endPtr(e){
+  const had = ptrs.delete(e.pointerId);
+  if (!had) return;
+  if (ptrs.size === 1) moved = true;
+  if (ptrs.size > 0 || moved) return;
+  const now = Date.now();
+  if (now - lastTap < 300){
+    clearTimeout(tapTimer); lastTap = 0;
+    if (Math.abs(zoom - 1) > 0.05) resetView(); else zoomAt(e.clientX, e.clientY, 2.5);
+  } else {
+    lastTap = now;
+    tapTimer = setTimeout(() => {
+      if (document.body.classList.contains('hide')) showUI();
+      else { clearTimeout(hideTimer); document.body.classList.add('hide'); }
+    }, 300);
+  }
+}
+canvas.addEventListener('pointerup', endPtr);
+canvas.addEventListener('pointercancel', endPtr);
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoomAt(e.clientX, e.clientY, zoom * Math.exp(-e.deltaY * 0.0015));
+}, {passive:false});
+document.querySelectorAll('.ui').forEach(el => el.addEventListener('pointerdown', showUI));
+showUI();
+
+const thumbKey = id => 'thumb1:' + game.id + ':' + id;
+let thumbCanvas = null, thumbGL = null, thumbRenderer = null, thumbChain = Promise.resolve();
+async function renderThumb(name){
+  if (!thumbCanvas){
+    thumbCanvas = document.createElement('canvas');
+    thumbCanvas.width = 320; thumbCanvas.height = 200;
+    thumbGL = thumbCanvas.getContext('webgl', {alpha:false, premultipliedAlpha:true, preserveDrawingBuffer:true});
+    thumbRenderer = new spine.SceneRenderer(thumbCanvas, thumbGL);
+  }
+  const built = await buildSkeleton(name, thumbGL);
+  try {
+    const data = built.data;
+    const sk = new spine.Skeleton(data);
+    const gs = skinGroups(data);
+    if (gs.length){ sk.setSkin(comboSkin(data, defaultPicks(gs))); sk.setSlotsToSetupPose(); }
+    const st = new spine.AnimationState(new spine.AnimationStateData(data));
+    const a = data.animations[0];
+    if (a){ st.setAnimation(0, a.name, false); st.update(Math.min(a.duration * 0.25, 1)); st.apply(sk); }
+    sk.updateWorldTransform(spine.Physics.update);
+    const off = new spine.Vector2(), size = new spine.Vector2();
+    sk.getBounds(off, size, []);
+    let bx = off.x, by = off.y, bw = size.x, bh = size.y;
+    if (!(bw > 1 && bh > 1)){ bx = data.x; by = data.y; bw = data.width; bh = data.height; }
+    let vw = bw * 1.1, vh = bh * 1.1;
+    if (vw / vh < 1.6) vw = vh * 1.6; else vh = vw / 1.6;
+    thumbGL.viewport(0, 0, 320, 200);
+    thumbGL.clearColor(0.043, 0.043, 0.055, 1); thumbGL.clear(thumbGL.COLOR_BUFFER_BIT);
+    thumbRenderer.camera.position.x = bx + bw / 2;
+    thumbRenderer.camera.position.y = by + bh / 2;
+    thumbRenderer.camera.setViewport(vw, vh);
+    thumbRenderer.camera.update();
+    thumbRenderer.begin(); thumbRenderer.drawSkeleton(sk, built.pma); thumbRenderer.end();
+    return thumbCanvas.toDataURL('image/webp', 0.8);
+  } finally {
+    try { built.atlas.dispose(); } catch(e){}
+  }
+}
+function makeThumb(id){
+  try { const c = localStorage.getItem(thumbKey(id)); if (c) return Promise.resolve(c); } catch(e){}
+  const job = thumbChain.then(async () => {
+    const url = await renderThumb(id);
+    try { localStorage.setItem(thumbKey(id), url); } catch(e){}
+    return url;
+  });
+  thumbChain = job.catch(() => {});
+  return job;
+}
+const thumbIO = new IntersectionObserver(es => es.forEach(e => {
+  if (!e.isIntersecting) return;
+  const th = e.target;
+  thumbIO.unobserve(th);
+  makeThumb(th.dataset.cg).then(url => {
+    const img = new Image();
+    img.onload = () => { img.classList.add('ok'); th.classList.add('done'); };
+    img.src = url;
+    th.append(img);
+  }).catch(() => th.classList.add('done'));
+}), {rootMargin: '200px'});
+function lazyThumb(th, id){ th.dataset.cg = id; thumbIO.observe(th); }
+
+let tab = 0;
+function buildTabs(){
+  const t = $('tabs'); t.innerHTML = '';
+  data.groups.forEach((g, i) => {
+    const b = document.createElement('button'); b.textContent = g.name;
+    b.onclick = () => { tab = i; buildGrid(); };
+    t.appendChild(b);
+  });
+}
+function buildGrid(){
+  const g = $('grid'); g.innerHTML = '';
+  [...$('tabs').children].forEach((b, i) => b.classList.toggle('on', i === tab));
+  (data.groups[tab] ? data.groups[tab].items : []).forEach(it => {
+    const t = document.createElement('div'); t.className = 'tile';
+    const th = document.createElement('div'); th.className = 'thumb';
+    if (it.thumb){
+      const img = new Image(); img.loading = 'lazy';
+      img.onload = () => { img.classList.add('ok'); th.classList.add('done'); };
+      img.onerror = () => { img.remove(); lazyThumb(th, it.seq ? it.seq[0] : it.id); };
+      img.src = G + it.thumb;
+      th.append(img);
+    } else lazyThumb(th, it.seq ? it.seq[0] : it.id);
+    const sp = document.createElement('span'); sp.className = 'num'; sp.textContent = it.title || it.id;
+    t.append(th, sp);
+    t.onclick = () => openCG(it.seq ? it.seq[0] : it.id, it.seq);
+    g.appendChild(t);
+  });
+}
+function openCG(name, seq){
+  $('gallery').hidden = true;
+  $('skins').hidden = true;
+  curSeq = seq || null; seqIdx = 0; nextPre = null; switching = false;
+  load(name); showUI();
+}
+$('gal').onclick = () => { $('gallery').hidden = false; buildGrid(); };
+$('gback').onclick = () => { location.search = ''; };
+$('gtitle').textContent = data.title || game.title;
+document.title = (data.title || game.title) + ' CG';
+buildTabs(); buildGrid();
+$('gallery').hidden = false;
+
+const fmt = s => s.toFixed(1);
+function frame(t){
+  requestAnimationFrame(frame);
+  if (!skel) return;
+  const dt = Math.min((t - last) / 1000, 0.1); last = t;
+  const w = Math.round(canvas.clientWidth * devicePixelRatio), h = Math.round(canvas.clientHeight * devicePixelRatio);
+  if (canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
+  gl.viewport(0, 0, w, h);
+  gl.clearColor(0.043, 0.043, 0.055, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+  state.update(paused || dragging ? 0 : dt); state.apply(skel);
+  skel.updateWorldTransform(spine.Physics.update);
+  const e = state.getCurrent(0);
+  if (e){
+    const dur = e.animationEnd - e.animationStart;
+    const cur = Math.min(Math.max(e.getAnimationTime() - e.animationStart, 0), dur);
+    if (!dragging){ seek.value = dur ? (cur / dur) * 1000 : 0; }
+    seek.style.setProperty('--p', (dur ? cur / dur * 100 : 0) + '%');
+    $('tcur').textContent = fmt(cur); $('tdur').textContent = fmt(dur);
+  }
+  let vw = sd.width, vh = sd.height;
+  if (vw / vh < w / h) vw = vh * w / h; else vh = vw * h / w;
+  baseVW = vw; baseVH = vh;
+  renderer.camera.position.x = sd.x + sd.width / 2 + panX;
+  renderer.camera.position.y = sd.y + sd.height / 2 + panY;
+  renderer.camera.setViewport(vw / zoom, vh / zoom);
+  renderer.camera.update();
+  renderer.begin(); renderer.drawSkeleton(skel, pma); renderer.end();
+}
+requestAnimationFrame(frame);
+}
+
+function showGames(games){
+  const g = $('ggrid'); g.innerHTML = '';
+  games.forEach(gm => {
+    const t = document.createElement('div'); t.className = 'tile';
+    const th = document.createElement('div'); th.className = 'thumb';
+    const img = new Image();
+    img.onload = () => { img.classList.add('ok'); th.classList.add('done'); };
+    img.onerror = () => { img.remove(); th.classList.add('done'); };
+    img.src = gm.cover || gm.path + '/cover.webp';
+    th.append(img);
+    const sp = document.createElement('span'); sp.textContent = gm.title;
+    t.append(th, sp);
+    t.onclick = () => { location.search = '?game=' + encodeURIComponent(gm.id); };
+    g.appendChild(t);
+  });
+  if (!games.length) g.innerHTML = '<div class="note">No games found. Check games.json.</div>';
+  $('games').hidden = false;
+}
+async function boot(){
+  let games = [];
+  try { games = await (await fetch('games.json')).json(); } catch(e){ console.error(e); }
+  const gid = new URLSearchParams(location.search).get('game');
+  const game = games.find(x => x.id === gid);
+  if (!game){ showGames(games); return; }
+  try {
+    const data = await (await fetch(game.path + '/game.json')).json();
+    await new Promise((res, rej) => {
+      const sc = document.createElement('script');
+      sc.src = game.runtime || 'spine-webgl.js'; sc.onload = res; sc.onerror = rej;
+      document.head.appendChild(sc);
+    });
+    initViewer(game, data);
+  } catch(e){ console.error(e); toast('Could not open ' + game.title); showGames(games); }
+}
+boot();
+</script>

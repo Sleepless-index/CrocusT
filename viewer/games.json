@@ -1,0 +1,16 @@
+[
+ {
+  "id": "pubpets",
+  "title": "PubPets",
+  "path": "games/pubpets",
+  "runtime": "spine-webgl.js",
+  "cover": "games/pubpets/thumbs/Thumbnail_Hetty_CG_01.png"
+ },
+ {
+  "id": "hazelnutlatte",
+  "title": "Hazelnut Latte",
+  "path": "games/hazelnutlatte",
+  "runtime": "spine-webgl.js",
+  "cover": "games/hazelnutlatte/cover.webp"
+ }
+]

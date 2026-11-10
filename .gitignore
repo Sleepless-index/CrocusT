@@ -1,0 +1,17 @@
+viewer/games/*/cg/
+viewer/games/*/thumbs/
+viewer/games/*/audio/
+viewer/games/*/img/
+viewer/games/*/cover.*
+viewer/cg/
+viewer/thumbs/
+viewer/audio/
+cg_sorted/
+cg_out/
+ta_out/
+*.png
+*.webp
+*.ogg
+*.wav
+*.mp3
+*.zip
