@@ -657,7 +657,7 @@ function buildGrid(){
 }
 /* ---- still images: full-size CGs, backgrounds, pin-ups ---- */
 const ivEl = $('iv'), ivImg = $('ivimg'), ivStage = $('ivstage');
-let ivGroup = null, ivIdx = 0, ivVar = 0, ivTok = 0;
+let ivGroup = null, ivIdx = 0, ivVar = 0, ivTok = 0, ivTimer = 0;
 let ivZoom = 1, ivTX = 0, ivTY = 0, ivBase = 1, ivNW = 0, ivNH = 0;
 function ivApply(){
   ivImg.style.transform = 'translate(' + ivTX + 'px,' + ivTY + 'px) scale(' + (ivBase * ivZoom) + ')';
@@ -680,7 +680,20 @@ function ivZoomAt(sx, sy, z2){
   ivZoom = z2; ivTX = sx - u * s1; ivTY = sy - v * s1;
   ivClamp(); ivApply();
 }
+function ivStop(){ if (ivTimer){ clearInterval(ivTimer); ivTimer = 0; } }
+function ivTogglePlay(btn){
+  if (ivTimer){ ivStop(); btn.textContent = '\u25B6'; btn.classList.remove('on'); return; }
+  const it = ivGroup.items[ivIdx], n = it.images.length;
+  it.images.forEach(p => { new Image().src = G + p; });
+  btn.textContent = '\u275A\u275A'; btn.classList.add('on');
+  ivTimer = setInterval(() => {
+    ivVar = (ivVar + 1) % n;
+    ivImg.src = G + it.images[ivVar];
+    [...$('ivvars').children].forEach((b, i) => { if (i < n) b.classList.toggle('on', i === ivVar); });
+  }, 1000 / (it.fps || 6));
+}
 function ivShow(){
+  ivStop();
   const it = ivGroup.items[ivIdx], n = ivGroup.items.length, tok = ++ivTok;
   $('ivttl').textContent = (it.title || it.id) + ' \u00b7 ' + (ivIdx + 1) + '/' + n;
   const vars = $('ivvars'); vars.innerHTML = '';
@@ -690,10 +703,15 @@ function ivShow(){
     b.onclick = () => { ivVar = i; ivShow(); };
     vars.appendChild(b);
   });
+  if (it.anim && it.images.length > 1){
+    const pb = document.createElement('button'); pb.className = 'chip'; pb.textContent = '\u25B6';
+    pb.setAttribute('aria-label', 'Play frames'); pb.onclick = () => ivTogglePlay(pb);
+    vars.appendChild(pb);
+  }
   $('load').hidden = false;
   ivImg.classList.remove('ok');
   ivImg.onload = () => {
-    if (tok !== ivTok) return;
+    if (tok !== ivTok || ivTimer) return;
     ivNW = ivImg.naturalWidth; ivNH = ivImg.naturalHeight;
     ivFit(); ivImg.classList.add('ok'); $('load').hidden = true;
   };
@@ -710,7 +728,7 @@ function openImages(group, idx){
   ivEl.hidden = false; ivEl.classList.remove('hide');
   ivShow();
 }
-function closeImages(){ ivEl.hidden = true; ivTok++; $('load').hidden = true; }
+function closeImages(){ ivStop(); ivEl.hidden = true; ivTok++; $('load').hidden = true; }
 $('ivclose').onclick = closeImages;
 $('ivprev').onclick = () => ivGo(-1);
 $('ivnext').onclick = () => ivGo(1);
