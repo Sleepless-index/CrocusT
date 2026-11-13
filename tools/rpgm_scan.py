@@ -6,6 +6,8 @@
 #   python rpgm_scan.py <unpacked game folder> --seq               also show the busiest picture sequence
 #   python rpgm_scan.py <unpacked game folder> --grep T0-C0       find any command (script, plugin, text...) containing that text
 #   python rpgm_scan.py <unpacked game folder> --plugin PictureAnimation   print that plugin's help text
+#   python rpgm_scan.py <unpacked game folder> --event Swimsuit_or_JP_name   print the picture commands of events whose name contains that text
+#   python rpgm_scan.py <unpacked game folder> --stage             list the always-running (autorun/parallel) events that show pictures
 import sys, os, re, json, collections
 
 CODES = {101: "Text", 108: "Comment", 408: "Comment+", 111: "If", 112: "Loop", 113: "BreakLoop", 115: "ExitEvt",
@@ -35,7 +37,9 @@ def lists_of(root):
     if os.path.exists(p):
         for e in jload(p):
             if e:
-                out.append(("Common %s '%s'" % (e["id"], e.get("name", "")), e["list"]))
+                trig = ["", "AUTORUN", "PARALLEL"][e.get("trigger", 0)] if e.get("trigger", 0) in range(3) else ""
+                out.append(("Common %s '%s'%s" % (e["id"], e.get("name", ""),
+                            " [%s sw%s]" % (trig, e.get("switchId")) if trig else ""), e["list"]))
     for f in sorted(os.listdir(d)):
         if re.match(r"Map\d+\.json$", f):
             try:
@@ -46,7 +50,14 @@ def lists_of(root):
                 if not e:
                     continue
                 for i, pg in enumerate(e.get("pages") or []):
-                    out.append(("%s ev%s '%s' p%d" % (f[:-5], e["id"], e.get("name", ""), i + 1), pg.get("list") or []))
+                    c = pg.get("conditions") or {}
+                    cond = []
+                    if c.get("switch1Valid"): cond.append("sw%s" % c.get("switch1Id"))
+                    if c.get("switch2Valid"): cond.append("sw%s" % c.get("switch2Id"))
+                    if c.get("variableValid"): cond.append("var%s>=%s" % (c.get("variableId"), c.get("variableValue")))
+                    trig = ["action", "touch", "evtouch", "AUTORUN", "PARALLEL"][pg.get("trigger", 0)] if pg.get("trigger", 0) in range(5) else "?"
+                    out.append(("%s ev%s '%s' p%d [%s %s]" % (f[:-5], e["id"], e.get("name", ""), i + 1, trig, " ".join(cond)),
+                                pg.get("list") or []))
     return out
 
 
@@ -71,6 +82,8 @@ def main():
     name = a[a.index("--name") + 1] if "--name" in a else None
     grep = a[a.index("--grep") + 1] if "--grep" in a else None
     plugin = a[a.index("--plugin") + 1] if "--plugin" in a else None
+    event = a[a.index("--event") + 1] if "--event" in a else None
+    stage = "--stage" in a
     seq = "--seq" in a
     lists = lists_of(root)
     print("project:", root)
@@ -84,6 +97,43 @@ def main():
             print("\n".join(l.rstrip() for l in body[:80]))
         except Exception as e:
             print("could not read", pf, e)
+        return
+    SHOWRE = re.compile(r"showPicture\(\s*(\d+)\s*,\s*[\"']([^\"']+)[\"']")
+
+    def pics_of(lst):
+        out = []
+        for c in lst:
+            if c["code"] == 231:
+                out.append((c["parameters"][0], str(c["parameters"][1])))
+            elif c["code"] in (355, 655):
+                for m in SHOWRE.finditer(str(c["parameters"][0])):
+                    out.append((int(m.group(1)), m.group(2)))
+        return out
+    if event:
+        n = 0
+        for label, lst in lists:
+            if event.lower() in label.lower() and pics_of(lst):
+                n += 1
+                if n > 3:
+                    break
+                print("\n=== " + label)
+                k = 0
+                for j, c in enumerate(lst):
+                    if c["code"] in (111, 117, 118, 119, 230, 231, 232, 235, 356, 357) or (
+                            c["code"] in (355, 655) and re.search(r"icture", str(c["parameters"][0]))):
+                        print("%4d %s" % (j, show_cmd(c)))
+                        k += 1
+                        if k >= 60:
+                            print("   ..."); break
+        if n == 0:
+            print("no event with pictures has '%s' in its name" % event)
+        return
+    if stage:
+        rows = [(label, pics_of(lst)) for label, lst in lists if re.search(r"AUTORUN|PARALLEL", label)]
+        rows = [r for r in rows if r[1]]
+        print("autorun/parallel events that show pictures: %d" % len(rows))
+        for label, pics in sorted(rows, key=lambda r: -len(r[1]))[:30]:
+            print("%s -> %s" % (label, ", ".join("%d:%s" % pn for pn in pics[:8]) + (" ..." if len(pics) > 8 else "")))
         return
     print("command lists:", len(lists))
     pj = os.path.join(root, "js", "plugins.js")

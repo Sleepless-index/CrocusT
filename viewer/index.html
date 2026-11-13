@@ -85,6 +85,19 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radiu
 #iv.hide #ivbot{opacity:0;transform:translateY(100%);pointer-events:none}
 #ivttl{flex:1;min-width:0;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:var(--s2)}
 #ivvars{flex:1;display:flex;gap:var(--s2);justify-content:center;overflow-x:auto;scrollbar-width:none}
+#sc{position:fixed;inset:0;z-index:7;background:#000}
+#scstage{position:absolute;left:0;right:0;top:calc(56px + env(safe-area-inset-top,0px));bottom:calc(56px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+#sccv{display:block;background:#26262b}
+#sctop{top:0;padding-top:calc(var(--s2) + env(safe-area-inset-top,0px));border-bottom:1px solid var(--line)}
+#scbot{bottom:0;padding-bottom:calc(var(--s2) + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
+#scttl{flex:1;min-width:0;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:var(--s2)}
+#scinfo{flex:1;text-align:center;color:var(--dim);font-size:14px}
+#sclist{position:absolute;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom,0px));max-height:55%;overflow:auto;background:var(--surface);border-top:1px solid var(--line);z-index:2}
+#sclhead{position:sticky;top:0;display:flex;gap:var(--s2);padding:var(--s2) 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.slrow{display:flex;gap:12px;align-items:center;padding:10px 16px;font-size:14px;min-height:44px}
+.slrow input{width:20px;height:20px;flex:none}
+.slrow span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slrow small{color:var(--dim);flex:none}
 #toast{position:fixed;left:50%;top:calc(76px + env(safe-area-inset-top,0px));z-index:9;max-width:90%;padding:var(--s2) var(--s3);border-radius:var(--r);background:var(--raised);border:1px solid var(--line);opacity:0;transform:translate(-50%,-6px);transition:opacity .15s,transform .15s;pointer-events:none;font-size:14px}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 </style>
@@ -140,6 +153,12 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radiu
   <div id="ivstage"><img id="ivimg" alt="" draggable="false"></div>
   <div id="ivtop" class="ivui"><button id="ivclose" class="btn" aria-label="Back"><svg class="ic"><use href="#i-back"/></svg></button><div id="ivttl"></div><button id="ivsave" class="btn" aria-label="Save image"><svg class="ic"><use href="#i-save"/></svg></button></div>
   <div id="ivbot" class="ivui"><button id="ivprev" class="btn" aria-label="Previous"><svg class="ic"><use href="#i-prev"/></svg></button><div id="ivvars"></div><button id="ivnext" class="btn" aria-label="Next"><svg class="ic"><use href="#i-next"/></svg></button></div>
+</div>
+<div id="sc" hidden>
+  <div id="scstage"><canvas id="sccv"></canvas></div>
+  <div id="sctop" class="ivui"><button id="scclose" class="btn" aria-label="Back"><svg class="ic"><use href="#i-back"/></svg></button><div id="scttl"></div><button id="screset" class="btn" aria-label="Reset scene"><svg class="ic"><use href="#i-reset"/></svg></button></div>
+  <div id="sclist" hidden><div id="sclhead"><button id="slall" class="chip">All on</button><button id="slnone" class="chip">All off</button><button id="slclose" class="chip">Close</button></div><div id="sclrows"></div></div>
+  <div id="scbot" class="ivui"><button id="sclay" class="chip">Layers</button><div id="scinfo"></div></div>
 </div>
 <div id="skins" hidden>
   <div id="skbg"></div>
@@ -645,16 +664,160 @@ function buildGrid(){
     if (it.thumb){
       const img = new Image(); img.loading = 'lazy';
       img.onload = () => { img.classList.add('ok'); th.classList.add('done'); };
-      img.onerror = () => { img.remove(); if (it.images) th.classList.add('done'); else lazyThumb(th, it.seq ? it.seq[0] : it.id); };
+      img.onerror = () => { img.remove(); if (it.images || it.scene != null) th.classList.add('done'); else lazyThumb(th, it.seq ? it.seq[0] : it.id); };
       img.src = G + it.thumb;
       th.append(img);
-    } else if (!it.images) lazyThumb(th, it.seq ? it.seq[0] : it.id);
+    } else if (it.scene != null) th.classList.add('done');
+    else if (!it.images) lazyThumb(th, it.seq ? it.seq[0] : it.id);
     const sp = document.createElement('span'); sp.className = 'num'; sp.textContent = it.title || it.id;
     t.append(th, sp);
-    t.onclick = () => it.images ? openImages(data.groups[tab], data.groups[tab].items.indexOf(it)) : openCG(it.seq ? it.seq[0] : it.id, it.seq);
+    t.onclick = () => it.scene != null ? openScene(it.scene) : it.images ? openImages(data.groups[tab], data.groups[tab].items.indexOf(it)) : openCG(it.seq ? it.seq[0] : it.id, it.seq);
     g.appendChild(t);
   });
 }
+/* ---- scenes: pictures stacked by slot (higher on top), timed like the game (waits), PictureAnimation frames, tappable pictures ---- */
+const scEl = $('sc'), scCv = $('sccv'), scCtx = scCv.getContext('2d'), scStage = $('scstage');
+const scData = data.sc || null;
+const scImgs = new Map(), scAlpha = new Map();
+let scLayers = [], scIdx = -1, scRAF = 0;   // scLayers: {L, t0} for every picture a scene (or a pressed button) added
+function scImg(p){ let i = scImgs.get(p); if (!i){ i = new Image(); i.src = G + p; scImgs.set(p, i); } return i; }
+function scCellIndex(a, ms){
+  if (!a) return 0;
+  const n = a.n || 1;
+  if (a.cell) return Math.min(Math.max(a.cell - 1, 0), n - 1);
+  if (!a.go || n < 2) return 0;
+  let seq = [];
+  if (a.t === 3 && a.p && a.p.length) seq = a.p.map(v => Math.min(Math.max(v - 1, 0), n - 1));
+  else { for (let i = 0; i < n; i++) seq.push(i); if (a.t === 2) for (let i = n - 2; i > 0; i--) seq.push(i); }
+  const step = Math.floor(ms / (a.i * 1000 / 60));
+  if (a.loop) return seq[step % seq.length];
+  return step >= seq.length ? 0 : seq[step];
+}
+function scProps(L, ms){          // ms = time since this picture appeared; moves start at m.at frames after that
+  let p = {x: L.x, y: L.y, sx: L.sx == null ? 100 : L.sx, sy: L.sy == null ? 100 : L.sy, op: L.op == null ? 255 : L.op};
+  const t = ms * 0.06;
+  for (const m of (L.m || [])){
+    if (t < (m.at || 0)) break;
+    const d = Math.max(m.d || 0, 0);
+    const q = {x: m.x == null ? p.x : m.x, y: m.y == null ? p.y : m.y, sx: m.sx == null ? p.sx : m.sx, sy: m.sy == null ? p.sy : m.sy, op: m.op == null ? p.op : m.op};
+    const u = t - (m.at || 0);
+    if (u < d){ const k = u / d; return {x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k, sx: p.sx + (q.sx - p.sx) * k, sy: p.sy + (q.sy - p.sy) * k, op: p.op + (q.op - p.op) * k}; }
+    p = q;
+  }
+  return p;
+}
+function scVisible(now){          // the picture in each slot right now (a later one replaces an earlier one), low slot first
+  const win = new Map();
+  for (const e of scLayers){
+    if (e.off) continue;                          // switched off in the Layers panel
+    const fr = (now - e.t0) * 0.06, d = e.L.d || 0;
+    if (fr < d) continue;
+    const start = e.t0 + d / 0.06, cur = win.get(e.L.s);
+    if (!cur || start >= cur.start) win.set(e.L.s, {e, start, fr});
+  }
+  const out = [];
+  [...win.keys()].sort((a, b) => a - b).forEach(k => {
+    const w = win.get(k), L = w.e.L;
+    if (L.e != null && w.fr >= L.e) return;        // erased
+    out.push({L, ms: now - w.start});
+  });
+  return out;
+}
+function scGeom(L, ms){
+  const a = L.a, idx = scCellIndex(a, ms), pr = scProps(L, ms);
+  let path = L.img, sx = 0, sy = 0, sw = L.w, sh = L.h;
+  if (L.c && L.c.length){ path = L.c[Math.min(idx, L.c.length - 1)]; const im = scImgs.get(path); if (im && im.naturalWidth){ sw = im.naturalWidth; sh = im.naturalHeight; } }
+  else if (a && a.lay === 'v' && a.n > 1){ sh = L.h / a.n; sy = sh * idx; }
+  else if (a && a.lay === 'h' && a.n > 1){ sw = L.w / a.n; sx = sw * idx; }
+  const dw = sw * pr.sx / 100, dh = sh * pr.sy / 100;
+  return {path, sx, sy, sw, sh, dw, dh, dx: L.o ? pr.x - dw / 2 : pr.x, dy: L.o ? pr.y - dh / 2 : pr.y, op: pr.op};
+}
+function scApply(i, depth){
+  const s = scData.scenes[i]; if (!s) return;
+  const now = performance.now();
+  // events it calls go underneath (the game shows base layers first), then its own pictures on top
+  if (depth < 2) (s.calls || []).forEach(c => { const j = scData.byCE[c]; if (j != null && j !== i) scApply(j, depth + 1); });
+  (s.l || []).forEach(L => scLayers.push({L, t0: now, off: false}));
+  if (scLayers.length > 600) scLayers = scLayers.slice(-600);
+}
+function scFit(){                 // keep the game's own aspect ratio, whatever the phone screen is
+  if (!scData) return;
+  const r = scStage.getBoundingClientRect(); if (!r.width || !r.height) return;
+  const k = Math.min(r.width / scData.w, r.height / scData.h);
+  scCv.style.width = Math.floor(scData.w * k) + 'px';
+  scCv.style.height = Math.floor(scData.h * k) + 'px';
+}
+function scFrame(ts){
+  if (scEl.hidden) return;
+  scCtx.globalAlpha = 1; scCtx.globalCompositeOperation = 'source-over';
+  scCtx.fillStyle = '#26262b'; scCtx.fillRect(0, 0, scData.w, scData.h);
+  scVisible(ts).forEach(v => {
+    const L = v.L, g = scGeom(L, v.ms); if (g.op <= 0) return;
+    const img = scImg(g.path); if (!img.complete || !img.naturalWidth) return;
+    scCtx.globalAlpha = Math.min(1, g.op / 255);
+    scCtx.globalCompositeOperation = ['source-over', 'lighter', 'multiply', 'screen'][L.bl || 0] || 'source-over';
+    scCtx.drawImage(img, g.sx, g.sy, g.sw, g.sh, g.dx, g.dy, g.dw, g.dh);
+  });
+  scRAF = requestAnimationFrame(scFrame);
+}
+function scOpaque(g, x, y){
+  const img = scImg(g.path); if (!img.naturalWidth) return false;
+  let c = scAlpha.get(g.path);
+  if (!c){ c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); scAlpha.set(g.path, c); }
+  const u = Math.floor(g.sx + (x - g.dx) / g.dw * g.sw), v = Math.floor(g.sy + (y - g.dy) / g.dh * g.sh);
+  try { return c.getContext('2d').getImageData(u, v, 1, 1).data[3] > 16; } catch(e){ return true; }
+}
+function scPress(b){
+  const t = b.k === 'ce' ? (scData.byCE[b.id] != null ? [scData.byCE[b.id]] : []) : (scData.bySw[b.id] || []);
+  if (!t.length){ toast((b.k === 'ce' ? 'Common event ' : 'Switch ') + b.id + ': nothing linked'); return; }
+  t.forEach(i => scApply(i, 0));
+  toast((b.k === 'ce' ? 'Common event ' : 'Switch ') + b.id);
+}
+scCv.onclick = e => {
+  const r = scCv.getBoundingClientRect();
+  const x = (e.clientX - r.left) * scData.w / r.width, y = (e.clientY - r.top) * scData.h / r.height, ts = performance.now();
+  const vis = scVisible(ts);
+  for (let k = vis.length - 1; k >= 0; k--){
+    const L = vis[k].L; if (!L.b) continue;
+    const g = scGeom(L, vis[k].ms);
+    if (x < g.dx || y < g.dy || x >= g.dx + g.dw || y >= g.dy + g.dh || g.op <= 0 || !scOpaque(g, x, y)) continue;
+    scPress(L.b); return;
+  }
+};
+function openScene(i){
+  if (!scData) return;
+  scIdx = i; scLayers = []; scApply(i, 0);
+  $('scttl').textContent = scData.scenes[i].t;
+  scCount(); $('sclist').hidden = true;
+  scEl.hidden = false;
+  scCv.width = scData.w; scCv.height = scData.h; scFit();
+  cancelAnimationFrame(scRAF); scRAF = requestAnimationFrame(scFrame);
+}
+function scList(){
+  const rows = $('sclrows'); rows.textContent = '';
+  scLayers.map((e, i) => ({e, i})).sort((a, b) => a.e.L.s - b.e.L.s).forEach(({e}) => {
+    const r = document.createElement('label'); r.className = 'slrow';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !e.off;
+    cb.onchange = () => { e.off = !cb.checked; scCount(); };
+    const nm = document.createElement('span'); nm.textContent = e.L.n || (e.L.img || '').split('/').pop();
+    const sl = document.createElement('small'); sl.textContent = 'slot ' + Math.floor(e.L.s) + (e.L.hid ? ' \u00b7 parked' : '');
+    r.append(cb, nm, sl); rows.appendChild(r);
+  });
+}
+function scCount(){
+  const btn = scLayers.filter(e => e.L.b).length, on = scLayers.filter(e => !e.off).length;
+  $('scinfo').textContent = on + '/' + scLayers.length + ' layers' + (btn ? ' \u00b7 ' + btn + ' tappable' : '');
+}
+$('sclay').onclick = () => { const l = $('sclist'); if (l.hidden){ scList(); l.hidden = false; } else l.hidden = true; };
+$('slclose').onclick = () => { $('sclist').hidden = true; };
+$('slall').onclick = () => { scLayers.forEach(e => { e.off = false; }); scList(); scCount(); };
+$('slnone').onclick = () => { scLayers.forEach(e => { e.off = true; }); scList(); scCount(); };
+function closeScene(){ scEl.hidden = true; $('sclist').hidden = true; cancelAnimationFrame(scRAF); }
+$('scclose').onclick = closeScene;
+$('screset').onclick = () => openScene(scIdx);
+window.addEventListener('keydown', e => { if (!scEl.hidden && e.key === 'Escape') closeScene(); });
+window.addEventListener('resize', () => { if (!scEl.hidden) scFit(); });
+
 /* ---- still images: full-size CGs, backgrounds, pin-ups ---- */
 const ivEl = $('iv'), ivImg = $('ivimg'), ivStage = $('ivstage');
 let ivGroup = null, ivIdx = 0, ivVar = 0, ivTok = 0, ivTimer = 0;
@@ -873,6 +1036,10 @@ async function boot(){
     try {
       const im = await fetch(game.path + '/images.json', {cache: 'no-store'});
       if (im.ok){ const j = await im.json(); data.groups = data.groups.concat(j.groups || []); }
+    } catch(e){}
+    try {
+      const sj = await fetch(game.path + '/scenes.json', {cache: 'no-store'});
+      if (sj.ok){ const j = await sj.json(); data.sc = j; data.groups = (j.groups || []).concat(data.groups); }
     } catch(e){}
     await new Promise((res, rej) => {
       const sc = document.createElement('script');

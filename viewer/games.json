@@ -12,19 +12,5 @@
   "path": "games/hazelnutlatte",
   "runtime": "spine-webgl.js",
   "cover": "games/hazelnutlatte/cover.webp"
- },
- {
-  "id": "bb",
-  "title": "Between Beasts",
-  "path": "games/bb",
-  "runtime": "spine-webgl.js",
-  "cover": "games/bb/img/th/alexa_encn_azote.webp"
- },
- {
-  "id": "neet",
-  "title": "How to Raise a Happy NEET",
-  "path": "games/neet",
-  "runtime": "spine-webgl.js",
-  "cover": "games/neet/img/th/pictures_a_0_b_1.webp"
  }
 ]
